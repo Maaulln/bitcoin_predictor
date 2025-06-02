@@ -235,3 +235,67 @@ class BitcoinPricePredictor:
             'predictions': denorm_predictions[-10:],  # Last 10 predictions
             'actuals': denorm_actuals[-10:]  # Last 10 actual values
         }
+    def save_model(self, file_path="bitcoin_model.json"):
+        """Save the trained model to a file."""
+        if not self.model:
+            raise ValueError("No trained model to save.")
+            
+        model_data = {
+            'model': self.model,
+            'min_price': self.min_price,
+            'max_price': self.max_price,
+            'window_size': self.window_size,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        with open(file_path, 'w') as f:
+            json.dump(model_data, f, indent=2)
+        
+        print(f"Model saved to {file_path}")
+
+    def load_model(self, file_path="bitcoin_model.json"):
+        """Load a trained model from a file."""
+        try:
+            with open(file_path, 'r') as f:
+                model_data = json.load(f)
+                
+            self.model = model_data['model']
+            self.min_price = model_data['min_price']
+            self.max_price = model_data['max_price']
+            self.window_size = model_data['window_size']
+            
+            print(f"Model loaded from {file_path}")
+            return True
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            return False
+
+    def predict_next_days(self, days=7):
+        """Predict Bitcoin prices for the next several days.
+        
+        Args:
+            days (int): Number of days to predict forward
+            
+        Returns:
+            list: List of predicted prices for the next 'days' days
+        """
+        if not self.model or not self.data:
+            raise ValueError("Model not trained or no data loaded.")
+        
+        # Get the most recent window_size prices
+        recent_prices = [entry['price'] for entry in self.data[:self.window_size]]
+        recent_prices.reverse()  # Oldest first
+        
+        predictions = []
+        current_window = recent_prices.copy()
+        
+        for _ in range(days):
+            # Make prediction
+            next_price = self.predict(current_window)
+            predictions.append(next_price)
+            
+            # Update window for next prediction
+            current_window.pop(0)
+            current_window.append(next_price)
+        
+        return predictions
