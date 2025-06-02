@@ -61,7 +61,7 @@ class BitcoinPricePredictor:
         except Exception as e:
             print(f"Error loading data: {e}")
             return False
-        
+
     def normalize_data(self):
         """Normalize the price data to the range [0, 1]."""
         prices = [entry['price'] for entry in self.data]
@@ -80,3 +80,21 @@ class BitcoinPricePredictor:
     def denormalize_price(self, normalized_price):
         """Convert a normalized price back to the original scale."""
         return normalized_price * (self.max_price - self.min_price) + self.min_price
+
+    def prepare_data(self):
+        """Prepare data for training and testing."""
+        self.normalize_data()
+        
+        # Create input-output pairs (X, y)
+        X, y = [], []
+        for i in range(len(self.normalized_data) - self.window_size):
+            X.append([self.normalized_data[i+j]['price'] for j in range(self.window_size)])
+            y.append(self.normalized_data[i+self.window_size]['price'])
+        
+        # Split into training and testing sets
+        split_idx = int(len(X) * self.train_ratio)
+        self.train_X, self.train_y = X[:split_idx], y[:split_idx]
+        self.test_X, self.test_y = X[split_idx:], y[split_idx:]
+        
+        print(f"Training data: {len(self.train_X)} samples")
+        print(f"Testing data: {len(self.test_X)} samples")
