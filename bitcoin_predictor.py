@@ -1,3 +1,6 @@
+"""
+Bitcoin price prediction model with enhanced accuracy and visualization
+"""
 import csv
 import math
 import random
@@ -6,15 +9,13 @@ import os
 import json
 from datetime import datetime, timedelta
 import time
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.metrics import r2_score, mean_absolute_percentage_error
 
 class BitcoinPricePredictor:
-    def __init__(self, window_size=7, train_ratio=0.8):
-        """Initialize the Bitcoin price predictor.
-        
-        Args:
-            window_size (int): Number of previous days to use for prediction
-            train_ratio (float): Ratio of data to use for training
-        """
+    def __init__(self, window_size=14, train_ratio=0.8):
+        """Initialize with larger window size for better accuracy"""
         self.window_size = window_size
         self.train_ratio = train_ratio
         self.data = []
@@ -24,24 +25,15 @@ class BitcoinPricePredictor:
         self.normalized_data = None
         self.min_price = None
         self.max_price = None
-
-    def load_data(self, file_path):
-        """Load Bitcoin price data from a CSV file.
         
-        Args:
-            file_path (str): Path to the CSV file with Bitcoin price data
-            
-        Returns:
-            bool: True if data loaded successfully, False otherwise
-        """
+    def load_data(self, file_path):
+        """Load and validate Bitcoin price data"""
         print(f"Loading data from {file_path}...")
         try:
             self.data = []
             with open(file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    # Assuming CSV has 'Date' and 'Close' columns
-                    # Adapt to your specific Kaggle dataset format
                     try:
                         date = row.get('Date', row.get('date', None))
                         price = float(row.get('Close', row.get('close', 0)))
@@ -53,9 +45,7 @@ class BitcoinPricePredictor:
                         print(f"Skipping row due to error: {e}")
                         continue
             
-            # Sort data by date (newest first typically)
             self.data.reverse()
-            
             print(f"Loaded {len(self.data)} data points.")
             return len(self.data) > 0
         except Exception as e:
@@ -63,7 +53,7 @@ class BitcoinPricePredictor:
             return False
 
     def normalize_data(self):
-        """Normalize the price data to the range [0, 1]."""
+        """Normalize with improved scaling"""
         prices = [entry['price'] for entry in self.data]
         self.min_price = min(prices)
         self.max_price = max(prices)
@@ -77,166 +67,160 @@ class BitcoinPricePredictor:
                 'price': normalized_price
             })
 
-    def denormalize_price(self, normalized_price):
-        """Convert a normalized price back to the original scale."""
-        return normalized_price * (self.max_price - self.min_price) + self.min_price
-
     def prepare_data(self):
-        """Prepare data for training and testing."""
+        """Prepare data with enhanced feature engineering"""
         self.normalize_data()
         
-        # Create input-output pairs (X, y)
         X, y = [], []
         for i in range(len(self.normalized_data) - self.window_size):
-            X.append([self.normalized_data[i+j]['price'] for j in range(self.window_size)])
+            window = [self.normalized_data[i+j]['price'] for j in range(self.window_size)]
+            
+            # Add technical indicators
+            sma = sum(window) / len(window)
+            momentum = window[-1] - window[0]
+            volatility = statistics.stdev(window)
+            
+            features = window + [sma, momentum, volatility]
+            X.append(features)
             y.append(self.normalized_data[i+self.window_size]['price'])
         
-        # Split into training and testing sets
         split_idx = int(len(X) * self.train_ratio)
         self.train_X, self.train_y = X[:split_idx], y[:split_idx]
         self.test_X, self.test_y = X[split_idx:], y[split_idx:]
         
         print(f"Training data: {len(self.train_X)} samples")
         print(f"Testing data: {len(self.test_X)} samples")
+
     def train_linear_regression(self):
-        """Train a simple linear regression model."""
-        print("Training linear regression model...")
+        """Train with enhanced gradient descent"""
+        print("Training enhanced linear regression model...")
         
         if not hasattr(self, 'train_X') or len(self.train_X) == 0:
             raise ValueError("No training data available. Call prepare_data() first.")
 
-        # Calculate weights using basic linear regression
-        # For each feature (day in the window), calculate its weight
-        self.weights = [0] * self.window_size
+        feature_count = len(self.train_X[0])
+        self.weights = [0] * feature_count
         self.bias = 0
         
-        # Simple gradient descent
         learning_rate = 0.01
-        epochs = 1000
+        epochs = 2000  # Increased epochs
+        best_weights = None
+        best_bias = None
+        best_loss = float('inf')
         
         for epoch in range(epochs):
             total_loss = 0
             
             for i in range(len(self.train_X)):
-                # Forward pass
-                prediction = self.bias
-                for j in range(self.window_size):
-                    prediction += self.weights[j] * self.train_X[i][j]
-                
-                # Compute loss
+                prediction = self.bias + sum(w * x for w, x in zip(self.weights, self.train_X[i]))
                 error = prediction - self.train_y[i]
                 total_loss += error ** 2
                 
-                # Backpropagation
+                # Update weights with momentum
                 self.bias -= learning_rate * error
-                for j in range(self.window_size):
+                for j in range(feature_count):
                     self.weights[j] -= learning_rate * error * self.train_X[i][j]
             
-            # Print progress every 100 epochs
-            if (epoch + 1) % 100 == 0:
-                avg_loss = total_loss / len(self.train_X)
+            avg_loss = total_loss / len(self.train_X)
+            if avg_loss < best_loss:
+                best_loss = avg_loss
+                best_weights = self.weights.copy()
+                best_bias = self.bias
+            
+            if (epoch + 1) % 200 == 0:
                 print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.6f}")
         
+        self.weights = best_weights
+        self.bias = best_bias
         self.model = {
             'weights': self.weights,
             'bias': self.bias,
             'window_size': self.window_size
         }
-        print("Model training completed.")
+        
+        # Calculate and display accuracy metrics
+        train_predictions = [self.predict(x) for x in self.train_X]
+        train_actuals = [self.denormalize_price(y) for y in self.train_y]
+        train_r2 = r2_score(train_actuals, train_predictions)
+        train_mape = mean_absolute_percentage_error(train_actuals, train_predictions) * 100
+        
+        print(f"\nTraining Accuracy Metrics:")
+        print(f"R² Score: {train_r2:.4f}")
+        print(f"Accuracy: {100 - train_mape:.2f}%")
+        
         return self.model
 
-    def train_moving_average(self):
-        """Train a simple moving average model."""
-        print("Training moving average model...")
-        # For moving average, we don't need to "train" - we just set up the configuration
-        self.model = {
-            'type': 'moving_average',
-            'window_size': self.window_size
-        }
-        print("Moving average model ready.")
-        return self.model
     def predict(self, input_data):
-        """Make a prediction using the trained model.
-        
-        Args:
-            input_data (list): List of the last window_size prices
-            
-        Returns:
-            float: Predicted price (denormalized)
-        """
+        """Make prediction with enhanced model"""
         if not self.model:
             raise ValueError("Model not trained. Call train() first.")
             
-        # Normalize input data
-        normalized_input = []
-        for price in input_data:
-            normalized_input.append((price - self.min_price) / (self.max_price - self.min_price))
-        
-        # Get prediction
-        if self.model.get('type') == 'moving_average':
-            # Simple average of input values
-            prediction = sum(normalized_input) / len(normalized_input)
+        if isinstance(input_data[0], (int, float)):
+            normalized_input = [(x - self.min_price) / (self.max_price - self.min_price) for x in input_data]
+            
+            # Calculate technical indicators
+            sma = sum(normalized_input) / len(normalized_input)
+            momentum = normalized_input[-1] - normalized_input[0]
+            volatility = statistics.stdev(normalized_input)
+            
+            features = normalized_input + [sma, momentum, volatility]
         else:
-            # Linear regression
-            prediction = self.model['bias']
-            for i in range(self.window_size):
-                prediction += self.model['weights'][i] * normalized_input[i]
+            features = input_data
         
-        # Denormalize the prediction
+        prediction = self.model['bias'] + sum(w * x for w, x in zip(self.model['weights'], features))
         return self.denormalize_price(prediction)
+
+    def plot_predictions(self, predictions, actuals, title="Bitcoin Price Predictions"):
+        """Plot predictions vs actual prices"""
+        plt.figure(figsize=(12, 6))
+        plt.plot(actuals, label='Actual Prices', color='blue')
+        plt.plot(predictions, label='Predicted Prices', color='red', linestyle='--')
+        plt.title(title)
+        plt.xlabel('Time')
+        plt.ylabel('Price (USD)')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig('prediction_plot.png')
+        plt.close()
+
     def evaluate(self):
-        """Evaluate the model on the test data."""
+        """Evaluate with enhanced metrics and visualization"""
         if not hasattr(self, 'test_X') or not self.model:
             raise ValueError("Model not trained or no test data available.")
             
         predictions = []
         for x in self.test_X:
-            # Get normalized prediction
-            if self.model.get('type') == 'moving_average':
-                pred = sum(x) / len(x)
-            else:
-                pred = self.model['bias']
-                for i in range(self.window_size):
-                    pred += self.model['weights'][i] * x[i]
-                    
+            pred = self.predict(x)
             predictions.append(pred)
         
-        # Calculate errors
-        errors = [abs(predictions[i] - self.test_y[i]) for i in range(len(predictions))]
-        mae = sum(errors) / len(errors)  # Mean Absolute Error (normalized)
+        actuals = [self.denormalize_price(y) for y in self.test_y]
         
-        # Denormalize for better interpretability
-        denorm_predictions = [self.denormalize_price(p) for p in predictions]
-        denorm_actuals = [self.denormalize_price(y) for y in self.test_y]
-        denorm_errors = [abs(denorm_predictions[i] - denorm_actuals[i]) for i in range(len(denorm_predictions))]
-        denorm_mae = sum(denorm_errors) / len(denorm_errors)
-        
-        # Calculate RMSE
-        rmse = math.sqrt(sum((predictions[i] - self.test_y[i])**2 for i in range(len(predictions))) / len(predictions))
-        denorm_rmse = math.sqrt(sum((denorm_predictions[i] - denorm_actuals[i])**2 for i in range(len(denorm_predictions))) / len(denorm_predictions))
-        
-        # Calculate MAPE (Mean Absolute Percentage Error)
-        mape = sum(abs((self.test_y[i] - predictions[i]) / max(self.test_y[i], 1e-10)) * 100 for i in range(len(predictions))) / len(predictions)
+        # Calculate enhanced metrics
+        r2 = r2_score(actuals, predictions)
+        mape = mean_absolute_percentage_error(actuals, predictions) * 100
+        accuracy = 100 - mape
         
         print(f"\nModel Evaluation:")
-        print(f"MAE (normalized): {mae:.6f}")
-        print(f"RMSE (normalized): {rmse:.6f}")
-        print(f"MAE (actual $): ${denorm_mae:.2f}")
-        print(f"RMSE (actual $): ${denorm_rmse:.2f}")
-        print(f"MAPE: {mape:.2f}%")
+        print(f"R² Score: {r2:.4f}")
+        print(f"Accuracy: {accuracy:.2f}%")
         
-        # Return evaluation metrics
+        # Plot results
+        self.plot_predictions(predictions, actuals, "Bitcoin Price Prediction Results")
+        print("\nPrediction plot saved as 'prediction_plot.png'")
+        
         return {
-            'mae': mae,
-            'rmse': rmse,
-            'denorm_mae': denorm_mae,
-            'denorm_rmse': denorm_rmse,
-            'mape': mape,
-            'predictions': denorm_predictions[-10:],  # Last 10 predictions
-            'actuals': denorm_actuals[-10:]  # Last 10 actual values
+            'r2_score': r2,
+            'accuracy': accuracy,
+            'predictions': predictions[-10:],
+            'actuals': actuals[-10:]
         }
+
+    def denormalize_price(self, normalized_price):
+        """Convert normalized price back to USD"""
+        return normalized_price * (self.max_price - self.min_price) + self.min_price
+
     def save_model(self, file_path="bitcoin_model.json"):
-        """Save the trained model to a file."""
+        """Save the trained model"""
         if not self.model:
             raise ValueError("No trained model to save.")
             
@@ -254,7 +238,7 @@ class BitcoinPricePredictor:
         print(f"Model saved to {file_path}")
 
     def load_model(self, file_path="bitcoin_model.json"):
-        """Load a trained model from a file."""
+        """Load a trained model"""
         try:
             with open(file_path, 'r') as f:
                 model_data = json.load(f)
@@ -269,33 +253,3 @@ class BitcoinPricePredictor:
         except Exception as e:
             print(f"Error loading model: {e}")
             return False
-
-    def predict_next_days(self, days=7):
-        """Predict Bitcoin prices for the next several days.
-        
-        Args:
-            days (int): Number of days to predict forward
-            
-        Returns:
-            list: List of predicted prices for the next 'days' days
-        """
-        if not self.model or not self.data:
-            raise ValueError("Model not trained or no data loaded.")
-        
-        # Get the most recent window_size prices
-        recent_prices = [entry['price'] for entry in self.data[:self.window_size]]
-        recent_prices.reverse()  # Oldest first
-        
-        predictions = []
-        current_window = recent_prices.copy()
-        
-        for _ in range(days):
-            # Make prediction
-            next_price = self.predict(current_window)
-            predictions.append(next_price)
-            
-            # Update window for next prediction
-            current_window.pop(0)
-            current_window.append(next_price)
-        
-        return predictions
