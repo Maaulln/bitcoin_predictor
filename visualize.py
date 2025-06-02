@@ -61,3 +61,37 @@ def print_line_graph(values, labels=None, width=60, height=15, title=None):
             label_line = " " * 7 + labels[0] + " " * (width - len(labels[0]) - len(labels[-1])) + labels[-1]
             print(label_line)
 
+def print_comparison(predicted, actual, labels=None):
+    """
+    Print a comparison table of predicted vs actual values.
+    
+    Args:
+        predicted (list): List of predicted values
+        actual (list): List of actual values
+        labels (list, optional): List of labels for each comparison
+    """
+    if len(predicted) != len(actual):
+        print("Error: Predicted and actual lists must have the same length")
+        return
+    
+    if not labels:
+        labels = [f"Point {i+1}" for i in range(len(predicted))]
+    
+    # Calculate errors
+    abs_errors = [abs(predicted[i] - actual[i]) for i in range(len(predicted))]
+    pct_errors = [abs(predicted[i] - actual[i]) / max(abs(actual[i]), 0.0001) * 100 for i in range(len(predicted))]
+    
+    # Print header
+    print("\nPrediction Comparison:")
+    print(f"{'Label':<10} {'Predicted':>12} {'Actual':>12} {'Error':>10} {'Error %':>10}")
+    print("-" * 60)
+    
+    # Print rows
+    for i in range(len(predicted)):
+        print(f"{labels[i]:<10} ${predicted[i]:>11.2f} ${actual[i]:>11.2f} ${abs_errors[i]:>9.2f} {pct_errors[i]:>9.2f}%")
+    
+    # Print summary
+    mae = sum(abs_errors) / len(abs_errors)
+    mape = sum(pct_errors) / len(pct_errors)
+    print("-" * 60)
+    print(f"{'Average':<10} {'':<12} {'':<12} ${mae:>9.2f} {mape:>9.2f}%")
