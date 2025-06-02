@@ -98,3 +98,51 @@ class BitcoinPricePredictor:
         
         print(f"Training data: {len(self.train_X)} samples")
         print(f"Testing data: {len(self.test_X)} samples")
+    def train_linear_regression(self):
+        """Train a simple linear regression model."""
+        print("Training linear regression model...")
+        
+        if not hasattr(self, 'train_X') or len(self.train_X) == 0:
+            raise ValueError("No training data available. Call prepare_data() first.")
+
+        # Calculate weights using basic linear regression
+        # For each feature (day in the window), calculate its weight
+        self.weights = [0] * self.window_size
+        self.bias = 0
+        
+        # Simple gradient descent
+        learning_rate = 0.01
+        epochs = 1000
+        
+        for epoch in range(epochs):
+            total_loss = 0
+            
+            for i in range(len(self.train_X)):
+                # Forward pass
+                prediction = self.bias
+                for j in range(self.window_size):
+                    prediction += self.weights[j] * self.train_X[i][j]
+                
+                # Compute loss
+                error = prediction - self.train_y[i]
+                total_loss += error ** 2
+                
+                # Backpropagation
+                self.bias -= learning_rate * error
+                for j in range(self.window_size):
+                    self.weights[j] -= learning_rate * error * self.train_X[i][j]
+            
+            # Print progress every 100 epochs
+            if (epoch + 1) % 100 == 0:
+                avg_loss = total_loss / len(self.train_X)
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.6f}")
+        
+        self.model = {
+            'weights': self.weights,
+            'bias': self.bias,
+            'window_size': self.window_size
+        }
+        print("Model training completed.")
+        return self.model
+
+    
