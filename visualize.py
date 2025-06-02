@@ -95,3 +95,23 @@ def print_comparison(predicted, actual, labels=None):
     mape = sum(pct_errors) / len(pct_errors)
     print("-" * 60)
     print(f"{'Average':<10} {'':<12} {'':<12} ${mae:>9.2f} {mape:>9.2f}%")
+
+def animate_loading(seconds=3, message="Processing"):
+    """
+    Display an animated loading message.
+    
+    Args:
+        seconds (int): Duration of the animation in seconds
+        message (str): Message to display during loading
+    """
+    animations = ["|", "/", "-", "\\"]
+    end_time = time.time() + seconds
+    
+    i = 0
+    while time.time() < end_time:
+        print(f"\r{message} {animations[i % len(animations)]}", end="", flush=True)
+        time.sleep(0.1)
+        i += 1
+    
+    print("\r" + " " * (len(message) + 2), end="\r")  # Clear the line
+
