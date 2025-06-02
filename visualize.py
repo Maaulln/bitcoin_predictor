@@ -115,3 +115,23 @@ def animate_loading(seconds=3, message="Processing"):
     
     print("\r" + " " * (len(message) + 2), end="\r")  # Clear the line
 
+def display_forecast(dates, prices, title="Bitcoin Price Forecast"):
+    """
+    Display a forecast of Bitcoin prices.
+    
+    Args:
+        dates (list): List of date strings
+        prices (list): List of price predictions
+        title (str): Title for the forecast
+    """
+    print(f"\n{title}")
+    print("-" * (len(title) + 2))
+    
+    for i in range(len(dates)):
+        print(f"{dates[i]}: ${prices[i]:,.2f}")
+    
+    # Print a simple trend indicator
+    if len(prices) >= 2:
+        trend = "↗️ Upward" if prices[-1] > prices[0] else "↘️ Downward" if prices[-1] < prices[0] else "→ Stable"
+        change = ((prices[-1] - prices[0]) / prices[0]) * 100
+        print(f"\nOverall Trend: {trend} ({change:+.2f}%)")
