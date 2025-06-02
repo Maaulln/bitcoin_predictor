@@ -61,3 +61,22 @@ class BitcoinPricePredictor:
         except Exception as e:
             print(f"Error loading data: {e}")
             return False
+        
+    def normalize_data(self):
+        """Normalize the price data to the range [0, 1]."""
+        prices = [entry['price'] for entry in self.data]
+        self.min_price = min(prices)
+        self.max_price = max(prices)
+        price_range = self.max_price - self.min_price
+        
+        self.normalized_data = []
+        for entry in self.data:
+            normalized_price = (entry['price'] - self.min_price) / price_range
+            self.normalized_data.append({
+                'date': entry['date'],
+                'price': normalized_price
+            })
+
+    def denormalize_price(self, normalized_price):
+        """Convert a normalized price back to the original scale."""
+        return normalized_price * (self.max_price - self.min_price) + self.min_price
