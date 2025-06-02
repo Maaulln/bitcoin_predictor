@@ -145,4 +145,14 @@ class BitcoinPricePredictor:
         print("Model training completed.")
         return self.model
 
+    def train_moving_average(self):
+        """Train a simple moving average model."""
+        print("Training moving average model...")
+        # For moving average, we don't need to "train" - we just set up the configuration
+        self.model = {
+            'type': 'moving_average',
+            'window_size': self.window_size
+        }
+        print("Moving average model ready.")
+        return self.model
     
