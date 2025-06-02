@@ -155,4 +155,32 @@ class BitcoinPricePredictor:
         }
         print("Moving average model ready.")
         return self.model
-    
+    def predict(self, input_data):
+        """Make a prediction using the trained model.
+        
+        Args:
+            input_data (list): List of the last window_size prices
+            
+        Returns:
+            float: Predicted price (denormalized)
+        """
+        if not self.model:
+            raise ValueError("Model not trained. Call train() first.")
+            
+        # Normalize input data
+        normalized_input = []
+        for price in input_data:
+            normalized_input.append((price - self.min_price) / (self.max_price - self.min_price))
+        
+        # Get prediction
+        if self.model.get('type') == 'moving_average':
+            # Simple average of input values
+            prediction = sum(normalized_input) / len(normalized_input)
+        else:
+            # Linear regression
+            prediction = self.model['bias']
+            for i in range(self.window_size):
+                prediction += self.model['weights'][i] * normalized_input[i]
+        
+        # Denormalize the prediction
+        return self.denormalize_price(prediction)
