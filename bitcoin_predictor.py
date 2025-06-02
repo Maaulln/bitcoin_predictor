@@ -184,3 +184,54 @@ class BitcoinPricePredictor:
         
         # Denormalize the prediction
         return self.denormalize_price(prediction)
+    def evaluate(self):
+        """Evaluate the model on the test data."""
+        if not hasattr(self, 'test_X') or not self.model:
+            raise ValueError("Model not trained or no test data available.")
+            
+        predictions = []
+        for x in self.test_X:
+            # Get normalized prediction
+            if self.model.get('type') == 'moving_average':
+                pred = sum(x) / len(x)
+            else:
+                pred = self.model['bias']
+                for i in range(self.window_size):
+                    pred += self.model['weights'][i] * x[i]
+                    
+            predictions.append(pred)
+        
+        # Calculate errors
+        errors = [abs(predictions[i] - self.test_y[i]) for i in range(len(predictions))]
+        mae = sum(errors) / len(errors)  # Mean Absolute Error (normalized)
+        
+        # Denormalize for better interpretability
+        denorm_predictions = [self.denormalize_price(p) for p in predictions]
+        denorm_actuals = [self.denormalize_price(y) for y in self.test_y]
+        denorm_errors = [abs(denorm_predictions[i] - denorm_actuals[i]) for i in range(len(denorm_predictions))]
+        denorm_mae = sum(denorm_errors) / len(denorm_errors)
+        
+        # Calculate RMSE
+        rmse = math.sqrt(sum((predictions[i] - self.test_y[i])**2 for i in range(len(predictions))) / len(predictions))
+        denorm_rmse = math.sqrt(sum((denorm_predictions[i] - denorm_actuals[i])**2 for i in range(len(denorm_predictions))) / len(denorm_predictions))
+        
+        # Calculate MAPE (Mean Absolute Percentage Error)
+        mape = sum(abs((self.test_y[i] - predictions[i]) / max(self.test_y[i], 1e-10)) * 100 for i in range(len(predictions))) / len(predictions)
+        
+        print(f"\nModel Evaluation:")
+        print(f"MAE (normalized): {mae:.6f}")
+        print(f"RMSE (normalized): {rmse:.6f}")
+        print(f"MAE (actual $): ${denorm_mae:.2f}")
+        print(f"RMSE (actual $): ${denorm_rmse:.2f}")
+        print(f"MAPE: {mape:.2f}%")
+        
+        # Return evaluation metrics
+        return {
+            'mae': mae,
+            'rmse': rmse,
+            'denorm_mae': denorm_mae,
+            'denorm_rmse': denorm_rmse,
+            'mape': mape,
+            'predictions': denorm_predictions[-10:],  # Last 10 predictions
+            'actuals': denorm_actuals[-10:]  # Last 10 actual values
+        }
